@@ -15,7 +15,7 @@ func main() {
 
 	err := challenge.Solve(os.Args[1])
 	if err != nil {
-		fmt.Println("error while trying to solve the riddle [err=%v]", err)
+		fmt.Printf("error while trying to solve the riddle [err=%v]\n", err)
 		os.Exit(1)
 	}
 
