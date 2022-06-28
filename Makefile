@@ -7,7 +7,7 @@ test:
 
 build:
 	cd src && go mod download && go mod vendor && \
-	go build -o ../dist/rtchallenge main/main.go
+	go build -o ../bin/rtchallenge main/main.go
 
 clean:
-	@rm -rf dist
+	@rm -rf bin
