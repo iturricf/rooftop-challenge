@@ -7,13 +7,16 @@ import (
 	"github.com/iturricf/rooftop-challenge/client"
 )
 
+var apiClient client.Client
+
 func Solve(login string) error {
-	token, err := client.GetToken(login)
+	apiClient = &client.DefaultClient{}
+	token, err := apiClient.GetToken(login)
 	if err != nil {
 		return err
 	}
 
-	blocks, err := client.GetBlocks(token)
+	blocks, err := apiClient.GetBlocks(token)
 	if err != nil {
 		return err
 	}
@@ -24,7 +27,7 @@ func Solve(login string) error {
 	}
 
 	fmt.Println("Should be ordered. Checking...")
-	checked, err := client.VerifyBlocks(orderedBlocks, token)
+	checked, err := apiClient.VerifyBlocks(orderedBlocks, token)
 	if err != nil {
 		return err
 	}
@@ -48,7 +51,7 @@ func Check(blocks []string, token string) ([]string, error) {
 	// Then, there is no need to check the last element as it will always be in order.
 	for sortedIndex < len(blocks)-2 {
 		pair := client.BlockPair{blocks[sortedIndex], blocks[scanIndex]}
-		checked, err := client.CheckPair(pair, token)
+		checked, err := apiClient.CheckPair(pair, token)
 		if err != nil {
 			return nil, err
 		}

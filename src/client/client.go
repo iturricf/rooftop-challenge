@@ -15,6 +15,15 @@ const (
 	checkBlocksURL = "https://rooftop-career-switch.herokuapp.com/check?token="
 )
 
+type Client interface {
+	GetToken(login string) (string, error)
+	GetBlocks(token string) ([]string, error)
+	CheckPair(blocks BlockPair, token string) (bool, error)
+	VerifyBlocks(blocks []string, token string) (bool, error)
+}
+
+type DefaultClient struct{}
+
 type TokenResponse struct {
 	Token string `json:"token"`
 }
@@ -39,7 +48,7 @@ type CheckResponse struct {
 	Message bool `json:"message"`
 }
 
-func GetToken(login string) (string, error) {
+func (c *DefaultClient) GetToken(login string) (string, error) {
 	resp, err := http.Get(getTokenURL + login)
 	if err != nil {
 		return "", err
@@ -64,7 +73,7 @@ func GetToken(login string) (string, error) {
 	return token.Token, nil
 }
 
-func GetBlocks(token string) ([]string, error) {
+func (c *DefaultClient) GetBlocks(token string) ([]string, error) {
 	resp, err := http.Get(getBlocksURL + token)
 	if err != nil {
 		return nil, err
@@ -89,7 +98,7 @@ func GetBlocks(token string) ([]string, error) {
 	return blocks.Data, nil
 }
 
-func CheckPair(blocks BlockPair, token string) (bool, error) {
+func (c *DefaultClient) CheckPair(blocks BlockPair, token string) (bool, error) {
 	blockData := CheckPayload{Blocks: blocks}
 	data, err := json.Marshal(blockData)
 	if err != nil {
@@ -104,7 +113,7 @@ func CheckPair(blocks BlockPair, token string) (bool, error) {
 	return response.Message, nil
 }
 
-func VerifyBlocks(blocks []string, token string) (bool, error) {
+func (c *DefaultClient) VerifyBlocks(blocks []string, token string) (bool, error) {
 	payload := VerifyPayload{Encoded: strings.Join(blocks[:], "")}
 	data, err := json.Marshal(payload)
 	if err != nil {
