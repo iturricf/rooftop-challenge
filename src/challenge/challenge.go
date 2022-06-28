@@ -1,57 +1,30 @@
 package challenge
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
+
+	"github.com/iturricf/rooftop-challenge/client"
 )
 
-type Token struct {
-	Token string `json:"token"`
-}
-
-type Blocks struct {
-	Data      []string `json:"data"`
-	ChunkSize int      `json:"chunkSize"`
-	Length    int      `json:"length"`
-}
-
-type BlockPair [2]string
-
-type BlockPairRequest struct {
-	Blocks BlockPair `json:"blocks"`
-}
-
-type EncodedBlock struct {
-	Encoded string `json:"encoded"`
-}
-
-type CheckResponse struct {
-	Message bool `json:"message"`
-}
-
-func SolveWithLogin(login string) error {
-	token, err := GetTokenWithLogin(login)
+func Solve(login string) error {
+	token, err := client.GetToken(login)
 	if err != nil {
 		return err
 	}
 
-	blocks, err := FetchBlocks(*token)
+	blocks, err := client.GetBlocks(token)
 	if err != nil {
 		return err
 	}
 
-	orderedBlocks, err := Check(blocks, *token)
+	orderedBlocks, err := Check(blocks, token)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Should be ordered. Checking ...")
-	checked, err := checkAll(orderedBlocks, *token)
+	fmt.Println("Should be ordered. Checking...")
+	checked, err := client.VerifyBlocks(orderedBlocks, token)
 	if err != nil {
 		return err
 	}
@@ -68,64 +41,14 @@ func SolveWithLogin(login string) error {
 	return nil
 }
 
-func GetTokenWithLogin(login string) (*Token, error) {
-	resp, err := http.Get("https://rooftop-career-switch.herokuapp.com/token?email=" + login)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("response error [err=%v]", resp.Status)
-	}
-
-	response, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	token := Token{}
-	err = json.Unmarshal(response, &token)
-	if err != nil {
-		return nil, nil
-	}
-
-	return &token, nil
-}
-
-func FetchBlocks(token Token) ([]string, error) {
-	resp, err := http.Get("https://rooftop-career-switch.herokuapp.com/blocks?token=" + token.Token)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("response error [err=%v]", resp.Status)
-	}
-
-	response, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	blocks := Blocks{}
-	err = json.Unmarshal(response, &blocks)
-	if err != nil {
-		return nil, err
-	}
-
-	return blocks.Data, nil
-}
-
-func Check(blocks []string, token Token) ([]string, error) {
+func Check(blocks []string, token string) ([]string, error) {
 	sortedIndex := 0
 	scanIndex := sortedIndex + 1
 	// Assuming it will always be possible to find a solution given a list of blocks
 	// Then, there is no need to check the last element as it will always be in order.
 	for sortedIndex < len(blocks)-2 {
-		pair := BlockPair{blocks[sortedIndex], blocks[scanIndex]}
-		checked, err := checkPair(pair, token)
+		pair := client.BlockPair{blocks[sortedIndex], blocks[scanIndex]}
+		checked, err := client.CheckPair(pair, token)
 		if err != nil {
 			return nil, err
 		}
@@ -144,74 +67,4 @@ func Check(blocks []string, token Token) ([]string, error) {
 	}
 
 	return blocks, nil
-}
-
-func checkPair(blocks BlockPair, token Token) (bool, error) {
-	blockData := BlockPairRequest{Blocks: blocks}
-	data, err := json.Marshal(blockData)
-	if err != nil {
-		return false, err
-	}
-
-	resp, err := http.Post(
-		"https://rooftop-career-switch.herokuapp.com/check?token="+token.Token,
-		"application/json",
-		bytes.NewBuffer(data),
-	)
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return false, fmt.Errorf("response error [err=%v]", resp.Status)
-	}
-
-	response, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, err
-	}
-
-	checkResponse := CheckResponse{}
-	err = json.Unmarshal(response, &checkResponse)
-	if err != nil {
-		return false, err
-	}
-
-	return checkResponse.Message, nil
-}
-
-func checkAll(blocks []string, token Token) (bool, error) {
-	encodedBlocks := EncodedBlock{Encoded: strings.Join(blocks[:], "")}
-	jsonBlocks, err := json.Marshal(encodedBlocks)
-	if err != nil {
-		return false, err
-	}
-
-	resp, err := http.Post(
-		"https://rooftop-career-switch.herokuapp.com/check?token="+token.Token,
-		"application/json",
-		bytes.NewBuffer(jsonBlocks),
-	)
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return false, fmt.Errorf("response error [err=%v]", resp.Status)
-	}
-
-	response, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, err
-	}
-
-	checkResponse := CheckResponse{}
-	err = json.Unmarshal(response, &checkResponse)
-	if err != nil {
-		return false, err
-	}
-
-	return checkResponse.Message, nil
 }
