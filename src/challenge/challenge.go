@@ -3,6 +3,7 @@ package challenge
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -49,6 +50,17 @@ func SolveWithLogin(login string) error {
 		return err
 	}
 
+	fmt.Println("Should be ordered. Checking ...")
+	checked, err := checkAll(orderedBlocks, *token)
+	if err != nil {
+		return err
+	}
+
+	if !checked {
+		return errors.New("failed to find a solution")
+	}
+
+	fmt.Printf("Blocks are ordered\n\n")
 	for i, block := range orderedBlocks {
 		fmt.Printf("Block #%v: %v\n", i, block)
 	}
@@ -109,7 +121,9 @@ func FetchBlocks(token Token) ([]string, error) {
 func Check(blocks []string, token Token) ([]string, error) {
 	sortedIndex := 0
 	scanIndex := sortedIndex + 1
-	for sortedIndex < len(blocks)-1 {
+	// Assuming it will always be possible to find a solution given a list of blocks
+	// Then, there is no need to check the last element as it will always be in order.
+	for sortedIndex < len(blocks)-2 {
 		pair := BlockPair{blocks[sortedIndex], blocks[scanIndex]}
 		checked, err := checkPair(pair, token)
 		if err != nil {
@@ -129,17 +143,6 @@ func Check(blocks []string, token Token) ([]string, error) {
 
 	}
 
-	fmt.Println("Should be ordered. Checking ...")
-	checked, err := checkAll(blocks, token)
-	if err != nil {
-		return nil, err
-	}
-
-	if checked {
-		fmt.Println("Checked")
-	}
-
-	fmt.Println("NOT Checked")
 	return blocks, nil
 }
 
