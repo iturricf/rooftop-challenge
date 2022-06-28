@@ -19,15 +19,17 @@ type Blocks struct {
 	Length    int      `json:"length"`
 }
 
-type BlockPair struct {
-	Blocks []string `json:"blocks"`
+type BlockPair [2]string
+
+type BlockPairRequest struct {
+	Blocks BlockPair `json:"blocks"`
 }
 
 type EncodedBlock struct {
 	Encoded string `json:"encoded"`
 }
 
-type EncodedBlockResponse struct {
+type CheckResponse struct {
 	Message bool `json:"message"`
 }
 
@@ -105,22 +107,75 @@ func FetchBlocks(token Token) ([]string, error) {
 }
 
 func Check(blocks []string, token Token) ([]string, error) {
-	for {
-		checked, err := checkAll(blocks, token)
+	sortedIndex := 0
+	scanIndex := sortedIndex + 1
+	for sortedIndex < len(blocks)-1 {
+		pair := BlockPair{blocks[sortedIndex], blocks[scanIndex]}
+		checked, err := checkPair(pair, token)
 		if err != nil {
 			return nil, err
 		}
-
+		if checked && scanIndex != sortedIndex+1 {
+			swap := blocks[sortedIndex+1]
+			blocks[sortedIndex+1] = blocks[scanIndex]
+			blocks[scanIndex] = swap
+		}
 		if checked {
-			break
+			sortedIndex += 1
+			scanIndex = sortedIndex + 1
+		} else {
+			scanIndex += 1
 		}
 
-		fmt.Println("NOT Checked")
-		return nil, nil
 	}
 
-	fmt.Println("All checked")
-	return nil, nil
+	fmt.Println("Should be ordered. Checking ...")
+	checked, err := checkAll(blocks, token)
+	if err != nil {
+		return nil, err
+	}
+
+	if checked {
+		fmt.Println("Checked")
+	}
+
+	fmt.Println("NOT Checked")
+	return blocks, nil
+}
+
+func checkPair(blocks BlockPair, token Token) (bool, error) {
+	blockData := BlockPairRequest{Blocks: blocks}
+	data, err := json.Marshal(blockData)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := http.Post(
+		"https://rooftop-career-switch.herokuapp.com/check?token="+token.Token,
+		"application/json",
+		bytes.NewBuffer(data),
+	)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("response error [err=%v]", resp.Status)
+	}
+
+	response, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+
+	checkResponse := CheckResponse{}
+	err = json.Unmarshal(response, &checkResponse)
+	if err != nil {
+		return false, err
+	}
+
+	return checkResponse.Message, nil
 }
 
 func checkAll(blocks []string, token Token) (bool, error) {
@@ -149,7 +204,7 @@ func checkAll(blocks []string, token Token) (bool, error) {
 		return false, err
 	}
 
-	checkResponse := EncodedBlockResponse{}
+	checkResponse := CheckResponse{}
 	err = json.Unmarshal(response, &checkResponse)
 	if err != nil {
 		return false, err
