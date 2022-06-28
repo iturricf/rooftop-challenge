@@ -1,10 +1,12 @@
 package challenge
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 type Token struct {
@@ -15,6 +17,18 @@ type Blocks struct {
 	Data      []string `json:"data"`
 	ChunkSize int      `json:"chunkSize"`
 	Length    int      `json:"length"`
+}
+
+type BlockPair struct {
+	Blocks []string `json:"blocks"`
+}
+
+type EncodedBlock struct {
+	Encoded string `json:"encoded"`
+}
+
+type EncodedBlockResponse struct {
+	Message bool `json:"message"`
 }
 
 func SolveWithLogin(login string) error {
@@ -28,7 +42,12 @@ func SolveWithLogin(login string) error {
 		return err
 	}
 
-	for i, block := range blocks {
+	orderedBlocks, err := Check(blocks, *token)
+	if err != nil {
+		return err
+	}
+
+	for i, block := range orderedBlocks {
 		fmt.Printf("Block #%v: %v\n", i, block)
 	}
 
@@ -83,4 +102,58 @@ func FetchBlocks(token Token) ([]string, error) {
 	}
 
 	return blocks.Data, nil
+}
+
+func Check(blocks []string, token Token) ([]string, error) {
+	for {
+		checked, err := checkAll(blocks, token)
+		if err != nil {
+			return nil, err
+		}
+
+		if checked {
+			break
+		}
+
+		fmt.Println("NOT Checked")
+		return nil, nil
+	}
+
+	fmt.Println("All checked")
+	return nil, nil
+}
+
+func checkAll(blocks []string, token Token) (bool, error) {
+	encodedBlocks := EncodedBlock{Encoded: strings.Join(blocks[:], "")}
+	jsonBlocks, err := json.Marshal(encodedBlocks)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := http.Post(
+		"https://rooftop-career-switch.herokuapp.com/check?token="+token.Token,
+		"application/json",
+		bytes.NewBuffer(jsonBlocks),
+	)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("response error [err=%v]", resp.Status)
+	}
+
+	response, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+
+	checkResponse := EncodedBlockResponse{}
+	err = json.Unmarshal(response, &checkResponse)
+	if err != nil {
+		return false, err
+	}
+
+	return checkResponse.Message, nil
 }
